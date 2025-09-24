@@ -1,0 +1,16 @@
+[package]
+name = "APTNinja"
+version = "1.0.0"
+authors = []
+
+[addresses]
+apt_ninja = "0x0ad94bb008073df8c8740d4474e52a6ddf226d3c84223e66fd861fb29810f073"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
+
+[dev-dependencies]
