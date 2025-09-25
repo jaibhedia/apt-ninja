@@ -88,7 +88,7 @@ export function useAptosService() {
     };
 
     /**
-     * Called when the game ends to finalize the score on-chain.
+     * Called when the game ends to finalizessss the score on-chain.
      */
     const handleEndGame = async () => {
         if (!account || !isSessionAuthorized) {
