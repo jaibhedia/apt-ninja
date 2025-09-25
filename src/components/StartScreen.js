@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
-import { useWallet } from './AptosWalletProvider';
+import React, { useState, useEffect } from 'react';
+import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import WalletConnectionModal from './WalletConnectionModal';
+import { useAptosService } from '../services/aptos_service';
 
 const StartScreen = ({ bestScore, onStartGame }) => {
   const { connected } = useWallet();
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const { handleAuthorizeSession, isSessionAuthorized } = useAptosService();
 
-  const handlePlayClick = () => {
+  const handlePlayClick = async () => {
     if (connected) {
-      onStartGame();
+        await handleAuthorizeSession();
     } else {
-      setShowWalletModal(true);
+        setShowWalletModal(true);
     }
-  };
+};
+
+useEffect(() => {
+    if (isSessionAuthorized) {
+        onStartGame();
+    }
+}, [isSessionAuthorized, onStartGame]);
+  
   return (
     <div className="screen start-screen">
       <div className="start-container">

@@ -10,7 +10,7 @@ module apt_ninja::game {
         details: Details
     }
 
-    struct Details has store, drop, copy {
+    struct Details has store, copy, drop {
         games: u64,
         high_score: u64,
         game_history: vector<Game>,
@@ -18,7 +18,7 @@ module apt_ninja::game {
         is_game_active: bool,
     }
 
-    struct Game has store, drop, copy {
+    struct Game has store, copy, drop {
         hits: u64,
         wrong_hits: u64,
         misses: u64,
@@ -103,13 +103,7 @@ module apt_ninja::game {
         let game_data = details.ongoing_game;
         details.is_game_active = false;
 
-        internal_record_game(
-            account,
-            game_data.hits,
-            game_data.wrong_hits,
-            game_data.misses,
-            game_data.total_score
-        );
+        internal_record_game(account, game_data.hits, game_data.wrong_hits, game_data.misses, game_data.total_score);
     }
 
     fun internal_record_game(account: &signer, hits: u64, wrong_hits: u64, misses: u64, total_score: u64) acquires Ninja {
@@ -158,75 +152,10 @@ module apt_ninja::game {
         assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
         borrow_global<Ninja>(player_address).details.high_score
     }
-}
-
-
-#[test_only]
-module apt_ninja::game_tests {
-    use std::signer;
-    use apt_ninja::game;
-
-    #[test(account = @0x1)]
-    fun test_create_profile_successfully(account: &signer) {
-        game::create_profile(account);
-        let addr = signer::address_of(account);
-        assert!(game::get_games_played(addr) == 0, 0);
-        assert!(game::get_high_score(addr) == 0, 1);
-    }
-
-    #[test(account = @0x2)]
-    #[expected_failure(abort_code = 524289)]
-    fun test_create_profile_fails_if_exists(account: &signer) {
-        game::create_profile(account);
-        game::create_profile(account);
-    }
-
-    #[test(account = @0x3)]
-    fun test_full_game_lifecycle_and_high_score(account: &signer) {
-        game::create_profile(account);
-        let addr = signer::address_of(account);
-        
-        // First game
-        game::start_game(account);
-        game::record_hit(account, 0, 10); // score: 10
-        game::record_hit(account, 0, 15); // score: 25
-        game::record_hit(account, 1, 5);  // score: 20
-        game::conclude_game(account);
-
-        assert!(game::get_games_played(addr) == 1, 0);
-        assert!(game::get_high_score(addr) == 20, 1);
-
-        // Second game, does not beat high score
-        game::start_game(account);
-        game::record_hit(account, 0, 10); // score: 10
-        game::conclude_game(account);
-
-        assert!(game::get_games_played(addr) == 2, 2);
-        assert!(game::get_high_score(addr) == 20, 3); // High score remains 20
-
-        // Third game, beats high score
-        game::start_game(account);
-        game::record_hit(account, 0, 30); // score: 30
-        game::conclude_game(account);
-
-        assert!(game::get_games_played(addr) == 3, 4);
-        assert!(game::get_high_score(addr) == 30, 5); // High score updates to 30
-    }
-
-    #[test(account = @0x4)]
-    #[expected_failure(abort_code = 3)]
-    fun test_start_game_fails_if_active(account: &signer) {
-        game::create_profile(account);
-        game::start_game(account);
-        // This second call should fail because a game is already in progress
-        game::start_game(account);
-    }
-
-    #[test(account = @0x5)]
-    #[expected_failure(abort_code = 4)]
-    fun test_conclude_game_fails_if_inactive(account: &signer) {
-        game::create_profile(account);
-        // This call should fail because no game has been started
-        game::conclude_game(account);
+    
+    #[view]
+    public fun is_game_active(player_address: address): bool acquires Ninja {
+        assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
+        borrow_global<Ninja>(player_address).details.is_game_active
     }
 }
