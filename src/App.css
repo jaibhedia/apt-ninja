@@ -51,3 +51,131 @@
   border-color: #ffd700;
   transform: translateY(-1px);
 }
+
+/* Keyboard Shortcuts Hint */
+.keyboard-shortcuts-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.shortcut-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.key-indicator {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .keyboard-shortcuts-hint {
+    bottom: 10px;
+    left: 10px;
+    font-size: 11px;
+  }
+  
+  .key-indicator {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+}
+
+/* Health Bar System */
+.heart-container {
+  position: relative;
+  display: inline-block;
+  margin: 0 4px;
+}
+
+.heart {
+  font-size: 24px;
+  color: #ff4444;
+  text-shadow: 
+    0 0 10px rgba(255, 68, 68, 0.8),
+    0 0 20px rgba(255, 68, 68, 0.4);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  transition: all 0.3s ease;
+}
+
+.heart.lost {
+  color: #666;
+  text-shadow: none;
+  filter: grayscale(100%);
+  opacity: 0.3;
+}
+
+.health-bar {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.health-fill {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: 1px;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* Health bar animations */
+@keyframes healthPulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.health-fill[style*="ff4444"] {
+  animation: healthPulse 1s infinite;
+}
+
+/* Responsive health bars */
+@media (max-width: 768px) {
+  .heart {
+    font-size: 20px;
+  }
+  
+  .health-bar {
+    width: 16px;
+    height: 2px;
+    bottom: -6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .heart {
+    font-size: 18px;
+  }
+  
+  .health-bar {
+    width: 14px;
+    height: 2px;
+    bottom: -5px;
+  }
+}

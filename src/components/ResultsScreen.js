@@ -1,10 +1,6 @@
 import React from 'react';
 
 const ResultsScreen = ({ gameState, onStartGame, onShowStartScreen }) => {
-  const accuracy = gameState.totalSlashes > 0 
-    ? Math.round((gameState.aptosSlashed / gameState.totalSlashes) * 100) 
-    : 0;
-
   const isNewBest = gameState.score > gameState.bestScore;
 
   return (
@@ -31,14 +27,6 @@ const ResultsScreen = ({ gameState, onStartGame, onShowStartScreen }) => {
             <div className="stat-item">
               <span className="stat-label">Aptos Tokens Slashed:</span>
               <span className="stat-value">{gameState.aptosSlashed}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Accuracy:</span>
-              <span className="stat-value">{accuracy}%</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Bombs Hit:</span>
-              <span className="stat-value">{gameState.bombsHit}</span>
             </div>
           </div>
         </div>

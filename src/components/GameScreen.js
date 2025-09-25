@@ -4,13 +4,16 @@ import { useSlashDetection } from '../hooks/useSlashDetection';
 import { useBladeTrail } from '../hooks/useBladeTrail';
 import { useVisibility } from '../hooks/useVisibility';
 import { usePointPopups } from '../hooks/usePointPopups';
+import { useMissedTokenNotifications } from '../hooks/useMissedTokenNotifications';
 import PointPopup from './PointPopup';
+import MissedTokenNotification from './MissedTokenNotification';
 
 const GameScreen = ({ 
   gameState, 
   onEndGame, 
   onUpdateScore, 
   onLoseLife, 
+  onLoseLiveFromMissedToken,
   onTogglePause,
   onCreateParticles,
   onCreateScreenFlash,
@@ -22,6 +25,18 @@ const GameScreen = ({
   const wasVisibleRef = useRef(isVisible);
   
   const { popups, addPopup, removePopup, clearAllPopups } = usePointPopups();
+  const { 
+    notifications: missedNotifications, 
+    addMissedNotification, 
+    removeMissedNotification, 
+    clearAllMissedNotifications 
+  } = useMissedTokenNotifications();
+
+  // Handle missed fruit without notification
+  const handleMissedFruit = useCallback(() => {
+    onLoseLiveFromMissedToken();
+    // Removed addMissedNotification() to disable popup
+  }, [onLoseLiveFromMissedToken]);
 
   const { 
     items, 
@@ -33,7 +48,7 @@ const GameScreen = ({
     clearAllItems,
     cleanupExcessItems,
     itemCount
-  } = useGameLoop(canvasRef, gameState, onEndGame, updateParticles);
+  } = useGameLoop(canvasRef, gameState, onEndGame, updateParticles, handleMissedFruit);
 
   const {
     bladeTrail,
@@ -117,12 +132,13 @@ const GameScreen = ({
     }
   }, [itemCount, cleanupExcessItems]);
 
-  // Clear popups when game ends
+  // Clear popups and notifications when game ends
   useEffect(() => {
     if (!gameState.isGameRunning) {
       clearAllPopups();
+      clearAllMissedNotifications();
     }
-  }, [gameState.isGameRunning, clearAllPopups]);
+  }, [gameState.isGameRunning, clearAllPopups, clearAllMissedNotifications]);
 
   useEffect(() => {
     const ctx = ctxRef.current;
@@ -184,14 +200,21 @@ const GameScreen = ({
         <div className="lives-container-overlay">
           <div className="lives-label">Lives</div>
           <div className="hearts">
-            {[1, 2, 3].map(i => (
-              <span 
-                key={i}
-                className={`heart ${i > gameState.lives ? 'lost' : ''}`}
-              >
-                ♥
-              </span>
-            ))}
+            {[1, 2, 3].map(i => {
+              const heartIndex = i - 1;
+              const heartHealth = gameState.heartHealth ? gameState.heartHealth[heartIndex] : 100;
+              const isActiveHeart = heartHealth > 0;
+              
+              return (
+                <div key={i} className="heart-container">
+                  <span 
+                    className={`heart ${!isActiveHeart ? 'lost' : ''}`}
+                  >
+                    ♥
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
         
@@ -215,6 +238,15 @@ const GameScreen = ({
         >
           <span>{gameState.isPaused ? '▶️' : '⏸️'}</span>
         </button>
+        
+        {/* Keyboard Shortcuts Hint - Only show when game is running */}
+        {gameState.isGameRunning && (
+          <div className="keyboard-shortcuts-hint">
+            <div className="shortcut-hint">
+              <span className="key-indicator">Space</span> or <span className="key-indicator">P</span> to pause
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Full Screen Canvas */}
@@ -231,6 +263,12 @@ const GameScreen = ({
       
       {/* Point Popups */}
       <PointPopup popups={popups} onRemovePopup={removePopup} />
+      
+      {/* Missed Token Notifications - Disabled */}
+      {/* <MissedTokenNotification 
+        notifications={missedNotifications} 
+        onRemoveNotification={removeMissedNotification} 
+      /> */}
     </div>
   );
 };

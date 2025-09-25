@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import StartScreen from './components/StartScreen';
 import GameScreen from './components/GameScreen';
 import ResultsScreen from './components/ResultsScreen';
@@ -7,6 +7,7 @@ import WalletSelector from './components/WalletSelector';
 import LandingPage from './components/LandingPage';
 import WalletWidget from './components/WalletWidget';
 import { useGameState } from './hooks/useGameState';
+import { useTaskbarControls } from './hooks/useTaskbarControls';
 import { useWallet } from './components/AptosWalletProvider';
 import './App.css';
 
@@ -17,6 +18,7 @@ function App() {
     endGame,
     updateScore,
     loseLife,
+    loseLiveFromMissedToken,
     togglePause,
     createScreenFlash
   } = useGameState();
@@ -24,6 +26,9 @@ function App() {
   const { connected, account } = useWallet();
   const [particles, setParticles] = useState([]);
   const [showLanding, setShowLanding] = useState(true);
+
+  // Add taskbar controls
+  useTaskbarControls(gameState, togglePause);
 
   const handleCreateParticles = useCallback((x, y, color, count) => {
     const newParticles = [];
@@ -76,6 +81,7 @@ function App() {
             onEndGame={endGame}
             onUpdateScore={updateScore}
             onLoseLife={loseLife}
+            onLoseLiveFromMissedToken={loseLiveFromMissedToken}
             onTogglePause={togglePause}
             onCreateParticles={handleCreateParticles}
             onCreateScreenFlash={createScreenFlash}
