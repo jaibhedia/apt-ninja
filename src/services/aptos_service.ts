@@ -1,4 +1,4 @@
-import { Aptos, AptosConfig, Network, Account} from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network, Account, SimpleTransaction, AccountAddress, Hex, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
 import { useWallet, InputTransactionData as WalletInputTransactionData } from "@aptos-labs/wallet-adapter-react";
 import { useState } from "react";
 
@@ -6,7 +6,24 @@ const APTOS_CONFIG = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(APTOS_CONFIG);
 
 // TODO: Replace with your deployed contract address
-const CONTRACT_ADDRESS = "0xad94bb008073df8c8740d4474e52a6ddf226d3c84223e66fd861fb29810f073";
+const CONTRACT_ADDRESS = "0x28c71a033cda51eed025d933ae1627dd50541d548206523643d9114b3aad3efa";
+
+// IMPORTANT: For a true gasless experience, a separate, funded account must pay for gas.
+// This secret key should be stored securely on a backend server, not in the frontend.
+// For testing, you can paste a private key here.
+
+const FEE_PAYER_SECRET_KEY = process.env.FEE_PAYER_SECRET_KEY;
+
+// 2. Add a check to ensure the variable is actually set.
+if (!FEE_PAYER_SECRET_KEY) {
+    throw new Error("FEE_PAYER_SECRET_KEY environment variable is not set. Please check your .env file.");
+}
+
+const privateKeyBytes = Hex.fromHexString(FEE_PAYER_SECRET_KEY).toUint8Array();
+
+const privateKey = new Ed25519PrivateKey(privateKeyBytes)
+const feePayer = Account.fromPrivateKey({ privateKey });
+
 
 export const useAptosService = () => {
     const { account, signAndSubmitTransaction } = useWallet();
@@ -14,108 +31,160 @@ export const useAptosService = () => {
     const [isSessionAuthorized, setIsSessionAuthorized] = useState(false);
 
     /**
-     * Called once at the start of the game session to delegate authority.
+     * Called once to delegate signing authority to a temporary session key.
      */
     const handleAuthorizeSession = async () => {
         if (!account) return;
 
-        // 1. Create a new, temporary account locally
+        // 1. Create a new, temporary account locally (this is the delegate)
         const newSessionKey = Account.generate();
         setSessionKey(newSessionKey);
-        console.log("Generated Session Key:", newSessionKey.accountAddress);
+        console.log("Generated Session Key Address:", newSessionKey.accountAddress.toString());
 
-        // 2. Build the transaction to delegate authority to this new key
+        // 2. Build the transaction to delegate authority to the new key
         const transaction: WalletInputTransactionData = {
             data: {
-                function: `${CONTRACT_ADDRESS}::game::delegate_session_key`,
+                function: `${CONTRACT_ADDRESS}::game::delegate_signer`,
                 functionArguments: [
-                    newSessionKey.accountAddress, // The key to authorize
-                    300, // Authorize for 5 minutes (300 seconds)
+                    newSessionKey.accountAddress.toString(), // The address to authorize
                 ],
-
-            }, 
+            },
         };
 
         try {
-            // 3. Player signs THIS ONE TRANSACTION to approve the session
+            // 3. Player signs THIS ONE TRANSACTION to approve the delegation
             const result = await signAndSubmitTransaction(transaction);
             await aptos.waitForTransaction({ transactionHash: result.hash });
-            console.log("Session authorized! Txn hash:", result.hash);
+            console.log("Delegation successful! Txn hash:", result.hash);
             setIsSessionAuthorized(true);
-            // Now you can start the game UI
         } catch (error) {
             console.error("Delegation failed:", error);
         }
     };
 
     /**
-     * This function can be called to signal the start of a game.
+     * Starts a new game on-chain, signed by the session key.
      */
     const handleStartGame = async () => {
-        if (!account || !isSessionAuthorized) {
-            alert("Player not connected or session not active.");
+        if (!account || !sessionKey || !isSessionAuthorized) {
+            alert("Player not connected or session not authorized.");
             return;
         }
-        console.log("Player is starting the game.");
-        // You can add any on-chain logic for starting a game here if needed
-    };
-
-    /**
-     * This function can be called repeatedly during gameplay without user prompts.
-     * @param scoreChange - The change in score for this fruit cut.
-     */
-    const handleSlashFruit = async (scoreChange: number) => {
-        if (!sessionKey || !account || !isSessionAuthorized) {
-            alert("Session not authorized!");
-            return;
-        }
-        console.log("Executing a hit with the session key...");
+        console.log("Starting game with session key...");
 
         const transaction = await aptos.transaction.build.simple({
             sender: sessionKey.accountAddress, // The SESSION KEY is the sender
+            withFeePayer: true, // IMPORTANT: Specify that a fee payer will be used
             data: {
-                function: `${CONTRACT_ADDRESS}::game::record_hit`,
+                function: `${CONTRACT_ADDRESS}::game::start_game`,
                 functionArguments: [
-                    account.address, // Pass the player's main address for lookup
-                    0, // hit_type
-                    scoreChange, // score_change
+                    account.address, // The player's main address
                 ],
             },
         });
 
-        const authenticator = aptos.transaction.sign({ signer: sessionKey, transaction });
-        const submittedTx = await aptos.transaction.submit.simple({ transaction, senderAuthenticator: authenticator });
-        console.log("Hit recorded! Transaction hash:", submittedTx.hash);
+        try {
+            // Sign the transaction with both the session key and the fee payer
+            const senderAuthenticator = aptos.transaction.sign({ signer: sessionKey, transaction });
+            const feePayerAuthenticator = aptos.transaction.signAsFeePayer({ signer: feePayer, transaction });
+
+            const submittedTx = await aptos.transaction.submit.multiAgent({
+                transaction,
+                senderAuthenticator,
+                additionalSignersAuthenticators: [feePayerAuthenticator],
+            });
+
+            console.log("Game started! Transaction hash:", submittedTx.hash);
+        } catch (error) {
+            console.error("Failed to start game:", error);
+        }
     };
 
     /**
-     * Called when the game ends to finalizessss the score on-chain.
+     * Records a hit on-chain, signed by the session key and paid for by the fee payer.
+     */
+    const handleSlashFruit = async (hitType: number, scoreChange: number) => {
+        if (!sessionKey || !account || !isSessionAuthorized) {
+            alert("Session not authorized!");
+            return;
+        }
+
+        const transaction = await aptos.transaction.build.simple({
+            sender: sessionKey.accountAddress, // The SESSION KEY is the sender
+            withFeePayer: true, // Specify that a fee payer will be used
+            data: {
+                function: `${CONTRACT_ADDRESS}::game::record_hit`,
+                functionArguments: [
+                    account.address, // Pass the player's main address
+                    hitType,
+                    scoreChange,
+                ],
+            },
+        });
+
+        try {
+            const senderAuthenticator = aptos.transaction.sign({ signer: sessionKey, transaction });
+            const feePayerAuthenticator = aptos.transaction.signAsFeePayer({ signer: feePayer, transaction });
+
+            const submittedTx = await aptos.transaction.submit.multiAgent({
+                transaction,
+                senderAuthenticator,
+                additionalSignersAuthenticators: [feePayerAuthenticator],
+            });
+            console.log(`Hit recorded (type: ${hitType})! Txn hash:`, submittedTx.hash);
+        } catch (error) {
+            console.error("Failed to record hit:", error);
+        }
+    };
+
+    /**
+     * Concludes the game on-chain, requiring the PLAYER'S main wallet signature.
      */
     const handleEndGame = async () => {
-        if (!account || !isSessionAuthorized) {
+        if (!account || !sessionKey || !isSessionAuthorized) {
             alert("Player not connected or session not active.");
             return;
         }
-        console.log("Player is ending the game. Requesting final signature...");
 
         const transaction: WalletInputTransactionData = {
             data: {
                 function: `${CONTRACT_ADDRESS}::game::conclude_game`,
-                functionArguments: [], // This function takes no arguments
+                functionArguments: [
+                    account.address, // The player's main address
+                ],
             },
         };
 
         try {
-            // This MUST be signed by the player's main wallet via the adapter
             const result = await signAndSubmitTransaction(transaction);
             await aptos.waitForTransaction({ transactionHash: result.hash });
-            console.log("Game concluded and score recorded! Txn hash:", result.hash);
+            console.log("Game concluded! Txn hash:", result.hash);
+        } catch (error) {
+            console.error("Failed to conclude game:", error);
+        }
+    };
 
-            // Reset the session state after the game is over
+    /**
+     * Revokes the delegate's authority. Signed by the player's main wallet.
+     */
+    const handleRevokeSession = async () => {
+        if (!account) return;
+
+        const transaction: WalletInputTransactionData = {
+            data: {
+                function: `${CONTRACT_ADDRESS}::game::delegate_signer`,
+                functionArguments: [AccountAddress.ZERO.toString()], // Delegate to the null address (0x0)
+            },
+        };
+
+        try {
+            const result = await signAndSubmitTransaction(transaction);
+            await aptos.waitForTransaction({ transactionHash: result.hash });
+            console.log("Session authority revoked! Txn hash:", result.hash);
             setIsSessionAuthorized(false);
             setSessionKey(null);
         } catch (error) {
-            console.error("Failed to conclude the game:", error);
+            console.error("Revocation failed:", error);
         }
     };
 
@@ -124,6 +193,7 @@ export const useAptosService = () => {
         handleStartGame,
         handleSlashFruit,
         handleEndGame,
+        handleRevokeSession, // Expose the revoke function
         isSessionAuthorized,
     };
-}
+};

@@ -16,6 +16,7 @@ module apt_ninja::game {
         game_history: vector<Game>,
         ongoing_game: Game,
         is_game_active: bool,
+        delegated_signer: address, // New field for delegation
     }
 
     struct Game has store, copy, drop {
@@ -37,6 +38,7 @@ module apt_ninja::game {
     const E_GAME_NOT_FOUND: u64 = 2;
     const E_GAME_ALREADY_IN_PROGRESS: u64 = 3;
     const E_NO_GAME_IN_PROGRESS: u64 = 4;
+    const E_NOT_AUTHORIZED: u64 = 5; // New error for unauthorized access
 
     #[entry]
     public fun create_profile(account: &signer) {
@@ -49,20 +51,34 @@ module apt_ninja::game {
             game_history: vector::empty<Game>(),
             ongoing_game: Game { hits: 0, wrong_hits: 0, misses: 0, total_score: 0 },
             is_game_active: false,
+            delegated_signer: @0x0, // Initialize with null address
         };
 
         move_to(account, Ninja {
-            address: string::utf8(b""),
+            address: string::utf8(b""), // This field is redundant but part of the original struct
             details: initial_details,
         });
     }
 
+    // New function to set a delegated signer
     #[entry]
-    public fun start_game(account: &signer) acquires Ninja {
+    public fun delegate_signer(account: &signer, delegated_address: address) acquires Ninja {
         let addr = signer::address_of(account);
         assert!(exists<Ninja>(addr), error::not_found(E_PROFILE_NOT_FOUND));
         let player_profile = borrow_global_mut<Ninja>(addr);
+        player_profile.details.delegated_signer = delegated_address;
+    }
+
+    // Modified function to support delegated signing
+    #[entry]
+    public fun start_game(account: &signer, player_address: address) acquires Ninja {
+        assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
+        let player_profile = borrow_global_mut<Ninja>(player_address);
         let details = &mut player_profile.details;
+
+        // Authorization Check
+        let signer_addr = signer::address_of(account);
+        assert!(signer_addr == player_address || signer_addr == details.delegated_signer, E_NOT_AUTHORIZED);
 
         assert!(!details.is_game_active, E_GAME_ALREADY_IN_PROGRESS);
 
@@ -70,45 +86,56 @@ module apt_ninja::game {
         details.is_game_active = true;
     }
 
+    // Modified function to support delegated signing
     #[entry]
-    public fun record_hit(account: &signer, hit_type: u8, score_change: u64) acquires Ninja {
-        let addr = signer::address_of(account);
-        assert!(exists<Ninja>(addr), error::not_found(E_PROFILE_NOT_FOUND));
-        let player_profile = borrow_global_mut<Ninja>(addr);
+    public fun record_hit(account: &signer, player_address: address, hit_type: u8, score_change: u64) acquires Ninja {
+        assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
+        let player_profile = borrow_global_mut<Ninja>(player_address);
         let details = &mut player_profile.details;
 
+        // Authorization Check
+        let signer_addr = signer::address_of(account);
+        assert!(signer_addr == player_address || signer_addr == details.delegated_signer, E_NOT_AUTHORIZED);
+        
         assert!(details.is_game_active, E_NO_GAME_IN_PROGRESS);
         let game = &mut details.ongoing_game;
 
-        if (hit_type == 0) {
+        if (hit_type == 0) { // Correct hit
             game.hits = game.hits + 1;
             game.total_score = game.total_score + score_change;
-        } else if (hit_type == 1) {
+        } else if (hit_type == 1) { // Wrong hit
             game.wrong_hits = game.wrong_hits + 1;
             game.total_score = if (game.total_score > score_change) game.total_score - score_change else 0;
-        } else {
+        } else { // Miss
             game.misses = game.misses + 1;
         }
     }
 
+    // Modified function to support delegated signing
     #[entry]
-    public fun conclude_game(account: &signer) acquires Ninja {
-        let addr = signer::address_of(account);
-        assert!(exists<Ninja>(addr), error::not_found(E_PROFILE_NOT_FOUND));
-        let player_profile = borrow_global_mut<Ninja>(addr);
+    public fun conclude_game(account: &signer, player_address: address) acquires Ninja {
+        assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
+        let player_profile = borrow_global_mut<Ninja>(player_address);
         let details = &mut player_profile.details;
+
+        // Authorization Check
+        let signer_addr = signer::address_of(account);
+        assert!(signer_addr == player_address || signer_addr == details.delegated_signer, E_NOT_AUTHORIZED);
 
         assert!(details.is_game_active, E_NO_GAME_IN_PROGRESS);
 
         let game_data = details.ongoing_game;
         details.is_game_active = false;
-
-        internal_record_game(account, game_data.hits, game_data.wrong_hits, game_data.misses, game_data.total_score);
+        
+        // Note: internal_record_game needs the player's signer, not the delegate's
+        // This is a complex interaction. For now, we pass the `player_address` and assume an internal function
+        // can handle it. A more advanced pattern might be needed if this function tried to `move_to`.
+        internal_record_game(player_address, game_data.hits, game_data.wrong_hits, game_data.misses, game_data.total_score);
     }
-
-    fun internal_record_game(account: &signer, hits: u64, wrong_hits: u64, misses: u64, total_score: u64) acquires Ninja {
-        let addr = signer::address_of(account);
-        let player_profile = borrow_global_mut<Ninja>(addr);
+    
+    // Internal function now takes address instead of signer
+    fun internal_record_game(player_address: address, hits: u64, wrong_hits: u64, misses: u64, total_score: u64) acquires Ninja {
+        let player_profile = borrow_global_mut<Ninja>(player_address);
         let details = &mut player_profile.details;
 
         let new_game = Game { hits, wrong_hits, misses, total_score };
@@ -121,11 +148,13 @@ module apt_ninja::game {
         vector::push_back(&mut details.game_history, new_game);
 
         event::emit(ProfileUpdated {
-            player_address: addr,
+            player_address: player_address,
             total_games: details.games,
             new_high_score: details.high_score,
         });
     }
+
+    // --- View Functions ---
 
     #[view]
     public fun get_player_details(player_address: address): Details acquires Ninja {
@@ -157,5 +186,12 @@ module apt_ninja::game {
     public fun is_game_active(player_address: address): bool acquires Ninja {
         assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
         borrow_global<Ninja>(player_address).details.is_game_active
+    }
+
+    // New view function to get the current delegate
+    #[view]
+    public fun get_delegated_signer(player_address: address): address acquires Ninja {
+        assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
+        borrow_global<Ninja>(player_address).details.delegated_signer
     }
 }

@@ -9,6 +9,7 @@ const StartScreen = ({ bestScore, onStartGame }) => {
   const [showWalletModal, setShowWalletModal] = useState(false);
 
   const handlePlayClick = () => {
+    console.log(isSessionAuthorized)
     if (connected && isSessionAuthorized) {
       onStartGame();
     } else {
