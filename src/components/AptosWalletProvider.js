@@ -58,13 +58,15 @@ const AptosWalletProvider = ({ children }) => {
     }
   }, []);
 
-  const signAndSubmitTransaction = useCallback(async (payload) => {
+  const signAndSubmitTransaction = useCallback(async (transactionInput) => {
     if (!connected || !window.aptos) {
       throw new Error('Wallet not connected');
     }
 
     try {
-      const response = await window.aptos.signAndSubmitTransaction(payload);
+      // Handle both old format (direct payload) and new format ({ payload })
+      const transactionPayload = transactionInput.payload || transactionInput;
+      const response = await window.aptos.signAndSubmitTransaction(transactionPayload);
       return response;
     } catch (error) {
       console.error('Transaction failed:', error);

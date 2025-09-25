@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAptosService } from '../services/aptos_service.js';
 
 export const useGameState = () => {
-  const { handleStartGame, handleSlashFruit, handleEndGame } = useAptosService();
+  const { handleStartGame, handleSlashFruit, handleEndGame, handleAuthorizeSession, isSessionAuthorized } = useAptosService();
   const [gameState, setGameState] = useState({
     screen: 'start',
     score: 0,
@@ -31,13 +31,24 @@ export const useGameState = () => {
       bombsHit: 0
     }));
     
+    // Check if session is authorized first
+    if (!isSessionAuthorized) {
+      console.log('Session not authorized, authorizing session first...');
+      try {
+        await handleAuthorizeSession();
+      } catch (error) {
+        console.error('Failed to authorize session:', error);
+        return; // Don't start the game if session authorization fails
+      }
+    }
+    
     // Call Aptos service to start game on blockchain
     try {
       await handleStartGame();
     } catch (error) {
       console.error('Failed to start game on blockchain:', error);
     }
-  }, [handleStartGame]);
+  }, [handleStartGame, handleAuthorizeSession, isSessionAuthorized]);
 
   const endGame = useCallback(async () => {
     setGameState(prev => {

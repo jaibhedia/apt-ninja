@@ -39,6 +39,7 @@ module apt_ninja::game {
     const E_GAME_ALREADY_IN_PROGRESS: u64 = 3;
     const E_NO_GAME_IN_PROGRESS: u64 = 4;
     const E_NOT_AUTHORIZED: u64 = 5; // New error for unauthorized access
+    const E_INVALID_HIT_TYPE: u64 = 6; // New error for invalid hit type
 
     #[entry]
     public fun create_profile(account: &signer) {
@@ -86,7 +87,12 @@ module apt_ninja::game {
         details.is_game_active = true;
     }
 
-    // Modified function to support delegated signing
+    // Hit type constants for better type safety
+    const HIT_TYPE_CORRECT: u8 = 0;
+    const HIT_TYPE_WRONG: u8 = 1;
+    const HIT_TYPE_MISS: u8 = 2;
+
+    // Modified function to support delegated signing with improved type handling
     #[entry]
     public fun record_hit(account: &signer, player_address: address, hit_type: u8, score_change: u64) acquires Ninja {
         assert!(exists<Ninja>(player_address), error::not_found(E_PROFILE_NOT_FOUND));
@@ -98,16 +104,28 @@ module apt_ninja::game {
         assert!(signer_addr == player_address || signer_addr == details.delegated_signer, E_NOT_AUTHORIZED);
         
         assert!(details.is_game_active, E_NO_GAME_IN_PROGRESS);
+        
+        // Validate hit_type parameter
+        assert!(hit_type <= HIT_TYPE_MISS, error::invalid_argument(6)); // E_INVALID_HIT_TYPE = 6
+        
         let game = &mut details.ongoing_game;
 
-        if (hit_type == 0) { // Correct hit
-            game.hits = game.hits + 1;
+        // Handle different hit types with proper u64 arithmetic
+        if (hit_type == HIT_TYPE_CORRECT) { // Correct hit
+            game.hits = game.hits + 1u64;
             game.total_score = game.total_score + score_change;
-        } else if (hit_type == 1) { // Wrong hit
-            game.wrong_hits = game.wrong_hits + 1;
-            game.total_score = if (game.total_score > score_change) game.total_score - score_change else 0;
-        } else { // Miss
-            game.misses = game.misses + 1;
+        } else if (hit_type == HIT_TYPE_WRONG) { // Wrong hit
+            game.wrong_hits = game.wrong_hits + 1u64;
+            // Safe subtraction to prevent underflow
+            if (game.total_score >= score_change) {
+                game.total_score = game.total_score - score_change;
+            } else {
+                game.total_score = 0u64;
+            }
+        } else if (hit_type == HIT_TYPE_MISS) { // Miss
+            game.misses = game.misses + 1u64;
+            // Misses don't affect score, but we can optionally penalize
+            // game.total_score remains unchanged for misses
         }
     }
 
