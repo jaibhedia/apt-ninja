@@ -8,13 +8,14 @@ export const useSlashDetection = (
   onLoseLife, 
   onCreateParticles, 
   onCreateScreenFlash,
-  addTrailPoint,  // Add blade trail function
-  isSlashing     // Get slashing state from blade trail
+  addTrailPoint,
+  isSlashing,
+  addPopup
 ) => {
   const [slashPath, setSlashPath] = useState([]);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const slashVelocity = useRef({ vx: 0, vy: 0 });
-  const slashedItems = useRef(new Set()); // Track already slashed items
+  const slashedItems = useRef(new Set());
 
   const getMousePos = useCallback((e) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -29,71 +30,12 @@ export const useSlashDetection = (
     };
   }, [canvasRef]);
 
-  const getDistanceToLine = useCallback((lineStart, lineEnd, point) => {
-    const dx = lineEnd.x - lineStart.x;
-    const dy = lineEnd.y - lineStart.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    
-    if (length === 0) {
-      const dx2 = point.x - lineStart.x;
-      const dy2 = point.y - lineStart.y;
-      return Math.sqrt(dx2 * dx2 + dy2 * dy2);
-    }
-    
-    const t = Math.max(0, Math.min(1, ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (length * length)));
-    const projectionX = lineStart.x + t * dx;
-    const projectionY = lineStart.y + t * dy;
-    
-    const distanceX = point.x - projectionX;
-    const distanceY = point.y - projectionY;
-    
-    return Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-  }, []);
-
-  const checkSlashCollisions = useCallback((currentPos, velocity) => {
-    if (!isSlashing || velocity.speed < 3) return; // Require minimum speed for cutting
-    
-    items.forEach((item) => {
-      if (item.slashed || slashedItems.current.has(item.id)) return;
-      
-      // Check if blade passes through the item
-      const dx = currentPos.x - item.x;
-      const dy = currentPos.y - item.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // More generous collision detection for better UX
-      if (distance < item.radius + 15) {
-        item.slashed = true;
-        slashedItems.current.add(item.id);
-        
-        if (item.type.isGood) {
-          // Aptos token - award points
-          onUpdateScore(item.type.points);
-          onCreateParticles(item.x, item.y, '#00ff88', 15);
-          
-          // Create slice effect with cutting angle
-          const angle = Math.atan2(velocity.vy, velocity.vx);
-          createSliceEffect(item, angle);
-        } else {
-          // Bomb - lose life
-          onLoseLife();
-          onCreateParticles(item.x, item.y, '#ff4444', 25);
-          onCreateScreenFlash();
-          
-          // Create explosion effect
-          createExplosionEffect(item);
-        }
-      }
-    });
-  }, [items, isSlashing, onUpdateScore, onLoseLife, onCreateParticles, onCreateScreenFlash]);
-
   const createSliceEffect = useCallback((item, angle) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
     
-    // Create two halves of the sliced item
     for (let i = 0; i < 2; i++) {
       const half = document.createElement('div');
       half.className = 'slice-half';
@@ -112,20 +54,18 @@ export const useSlashDetection = (
       half.style.justifyContent = 'center';
       half.textContent = item.type.symbol;
       
-      // Add physics-based movement
       const direction = i === 0 ? 1 : -1;
       const perpAngle = angle + Math.PI / 2;
       const vx = Math.cos(perpAngle) * direction * 100;
-      const vy = Math.sin(perpAngle) * direction * 100 - 50; // Add upward motion
+      const vy = Math.sin(perpAngle) * direction * 100 - 50;
       
-      half.style.transform = `rotate(${angle}rad)`;
+      half.style.transform = 'rotate(' + angle + 'rad)';
       half.style.transition = 'transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.8s ease-out';
       
       document.body.appendChild(half);
       
-      // Animate the half
       requestAnimationFrame(() => {
-        half.style.transform = `translate(${vx}px, ${vy}px) rotate(${angle + direction * Math.PI}rad) scale(0.3)`;
+        half.style.transform = 'translate(' + vx + 'px, ' + vy + 'px) rotate(' + (angle + direction * Math.PI) + 'rad) scale(0.3)';
         half.style.opacity = '0';
       });
       
@@ -164,15 +104,58 @@ export const useSlashDetection = (
     }, 600);
   }, [canvasRef]);
 
+  const checkSlashCollisions = useCallback((currentPos, velocity) => {
+    if (!isSlashing || velocity.speed < 3) return;
+    
+    items.forEach((item) => {
+      if (item.slashed || slashedItems.current.has(item.id)) return;
+      
+      const dx = currentPos.x - item.x;
+      const dy = currentPos.y - item.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance < item.radius + 15) {
+        item.slashed = true;
+        slashedItems.current.add(item.id);
+        
+        const canvas = canvasRef.current;
+        const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+        const popupX = rect.left + item.x;
+        const popupY = rect.top + item.y;
+        
+        if (item.type.isGood) {
+          onUpdateScore(item.type.points);
+          onCreateParticles(item.x, item.y, '#00ff88', 15);
+          
+          if (addPopup) {
+            addPopup(popupX, popupY, item.type.points, 'token');
+          }
+          
+          const angle = Math.atan2(velocity.vy, velocity.vx);
+          createSliceEffect(item, angle);
+        } else {
+          onLoseLife();
+          onCreateParticles(item.x, item.y, '#ff4444', 25);
+          onCreateScreenFlash();
+          
+          if (addPopup) {
+            addPopup(popupX, popupY, 1, 'bomb');
+          }
+          
+          createExplosionEffect(item);
+        }
+      }
+    });
+  }, [items, isSlashing, onUpdateScore, onLoseLife, onCreateParticles, onCreateScreenFlash, addPopup, canvasRef, createSliceEffect, createExplosionEffect]);
+
   const startSlash = useCallback((e) => {
     if (gameState.screen !== 'game' || !gameState.isGameRunning || gameState.isPaused) return;
     
     const pos = getMousePos(e);
     lastMousePos.current = pos;
     slashVelocity.current = { vx: 0, vy: 0, speed: 0 };
-    slashedItems.current.clear(); // Clear slashed items for new gesture
+    slashedItems.current.clear();
     
-    // Add initial trail point
     addTrailPoint(pos.x, pos.y);
     setSlashPath([pos]);
   }, [gameState.screen, gameState.isGameRunning, gameState.isPaused, getMousePos, addTrailPoint]);
@@ -183,18 +166,15 @@ export const useSlashDetection = (
     const currentPos = getMousePos(e);
     const lastPos = lastMousePos.current;
     
-    // Calculate velocity
     const vx = currentPos.x - lastPos.x;
     const vy = currentPos.y - lastPos.y;
     const speed = Math.sqrt(vx * vx + vy * vy);
     
     slashVelocity.current = { vx, vy, speed };
     
-    // Add trail point
     addTrailPoint(currentPos.x, currentPos.y);
     setSlashPath(prev => [...prev, currentPos]);
     
-    // Check collisions with current velocity
     checkSlashCollisions(currentPos, slashVelocity.current);
     lastMousePos.current = currentPos;
   }, [isSlashing, gameState.screen, gameState.isGameRunning, gameState.isPaused, getMousePos, addTrailPoint, checkSlashCollisions]);
@@ -202,7 +182,6 @@ export const useSlashDetection = (
   const endSlash = useCallback(() => {
     if (!isSlashing) return;
     
-    // Trail will fade naturally, don't clear immediately
     setTimeout(() => {
       setSlashPath([]);
       slashedItems.current.clear();

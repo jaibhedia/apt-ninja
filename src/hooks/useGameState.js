@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import GameComponent from '../services/aptos_service';
 
 export const useGameState = () => {
   const [gameState, setGameState] = useState({

@@ -130,24 +130,24 @@
   overflow: hidden;
 }
 
-/* Background Video */
+/* Background Video - Edge to Edge */
 .hero-bg-video {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   object-fit: cover;
   z-index: -2;
 }
 
-/* Video Overlay */
+/* Video Overlay - Edge to Edge */
 .hero-video-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.6);
   background: linear-gradient(
     135deg,

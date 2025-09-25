@@ -1,233 +1,238 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import useGameLoop from '../hooks/useGameLoop';
-import useSlashDetection from '../hooks/useSlashDetection';
-import useBladeTrail from '../hooks/useBladeTrail';
-import useVisibility from '../hooks/useVisibility';
-import { useAptosService } from '../services/aptos_service';
+import { useGameLoop } from '../hooks/useGameLoop';
+import { useSlashDetection } from '../hooks/useSlashDetection';
+import { useBladeTrail } from '../hooks/useBladeTrail';
+import { useVisibility } from '../hooks/useVisibility';
+import { usePointPopups } from '../hooks/usePointPopups';
+import PointPopup from './PointPopup';
 
-const GameScreen = ({
+const GameScreen = ({ 
+  gameState, 
+  onEndGame, 
+  onUpdateScore, 
+  onLoseLife, 
+  onTogglePause,
+  onCreateParticles,
+  onCreateScreenFlash,
+  updateParticles
+}) => {
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const isVisible = useVisibility();
+  const wasVisibleRef = useRef(isVisible);
+  
+  const { popups, addPopup, removePopup, clearAllPopups } = usePointPopups();
+
+  const { 
+    items, 
+    slashTrail, 
+    particles,
+    spawnItem,
+    updateGame,
+    render,
+    clearAllItems,
+    cleanupExcessItems,
+    itemCount
+  } = useGameLoop(canvasRef, gameState, onEndGame, updateParticles);
+
+  const {
+    bladeTrail,
+    isSlashing,
+    addTrailPoint,
+    updateTrail,
+    startSlashing,
+    stopSlashing,
+    renderBladeTrail
+  } = useBladeTrail();
+
+  const {
+    startSlash,
+    updateSlash,
+    endSlash
+  } = useSlashDetection(
+    canvasRef,
+    items,
     gameState,
-    onEndGame,
     onUpdateScore,
     onLoseLife,
-    onTogglePause,
     onCreateParticles,
     onCreateScreenFlash,
-    updateParticles,
-}) => {
-    const canvasRef = useRef(null);
-    const ctxRef = useRef(null);
-    const isVisible = useVisibility();
-    const wasVisibleRef = useRef(isVisible);
-    const { handleStartGame, handleSlashFruit, handleEndGame } = useAptosService();
+    addTrailPoint,
+    isSlashing,
+    addPopup
+  );
 
-    const {
-        items,
-        slashTrail,
-        particles,
-        spawnItem,
-        updateGame,
-        render,
-        clearAllItems,
-        cleanupExcessItems,
-        itemCount,
-    } = useGameLoop(canvasRef, gameState, onEndGame, updateParticles);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const {
-        bladeTrail,
-        isSlashing,
-        addTrailPoint,
-        updateTrail,
-        startSlashing,
-        stopSlashing,
-        renderBladeTrail,
-    } = useBladeTrail();
+    const ctx = canvas.getContext('2d');
+    ctxRef.current = ctx;
 
-    const onFruitCut = (score) => {
-        onUpdateScore(score);
-        handleSlashFruit(score);
+    // Resize canvas to full screen
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     };
-    
-    const { startSlash, updateSlash, endSlash } = useSlashDetection(
-        canvasRef,
-        items,
-        gameState,
-        onFruitCut,
-        onLoseLife,
-        onCreateParticles,
-        onCreateScreenFlash,
-        addTrailPoint,
-        isSlashing
-    );
 
-    useEffect(() => {
-        if (gameState.isGameRunning) {
-            handleStartGame();
-        }
-    }, [gameState.isGameRunning]);
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
-    useEffect(() => {
-        if (gameState.lives === 0) {
-            handleEndGame();
-        }
-    }, [gameState.lives]);
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
 
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        ctxRef.current = ctx;
+  useEffect(() => {
+    // Only run game loops when tab is visible and game is running
+    if (!gameState.isGameRunning || gameState.isPaused || !isVisible) return;
 
-        // Resize canvas to full screen
-        const resizeCanvas = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        };
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        return () => window.removeEventListener('resize', resizeCanvas);
-    }, []);
+    const gameLoop = setInterval(() => {
+      updateGame();
+      updateTrail(); // Update blade trail
+    }, 16);
+    const itemSpawner = setInterval(spawnItem, 1200);
 
-    useEffect(() => {
-        // Only run game loops when tab is visible and game is running
-        if (!gameState.isGameRunning || gameState.isPaused || !isVisible) return;
+    return () => {
+      clearInterval(gameLoop);
+      clearInterval(itemSpawner);
+    };
+  }, [gameState.isGameRunning, gameState.isPaused, updateGame, spawnItem, updateTrail, isVisible]);
 
-        const gameLoop = setInterval(() => {
-            updateGame();
-            updateTrail(); // Update blade trail
-        }, 16); // 60 FPS
+  // Auto-pause when tab becomes invisible, resume when visible again
+  useEffect(() => {
+    if (wasVisibleRef.current !== isVisible && gameState.isGameRunning) {
+      if (!isVisible && !gameState.isPaused) {
+        // Tab became invisible and game was running - auto pause
+        onTogglePause();
+      }
+    }
+    wasVisibleRef.current = isVisible;
+  }, [isVisible, gameState.isGameRunning, gameState.isPaused, onTogglePause]);
 
-        const itemSpawner = setInterval(spawnItem, 1200);
+  // Clean up excess items periodically
+  useEffect(() => {
+    if (itemCount > 15) { // If items exceed safe threshold
+      cleanupExcessItems();
+    }
+  }, [itemCount, cleanupExcessItems]);
 
-        return () => {
-            clearInterval(gameLoop);
-            clearInterval(itemSpawner);
-        };
-    }, [gameState.isGameRunning, gameState.isPaused, updateGame, spawnItem, updateTrail, isVisible]);
+  // Clear popups when game ends
+  useEffect(() => {
+    if (!gameState.isGameRunning) {
+      clearAllPopups();
+    }
+  }, [gameState.isGameRunning, clearAllPopups]);
 
-    // Auto-pause when tab becomes invisible, resume when visible again
-    useEffect(() => {
-        if (wasVisibleRef.current !== isVisible && gameState.isGameRunning) {
-            if (!isVisible && !gameState.isPaused) { // Tab became invisible and game was running - auto pause
-                onTogglePause();
-            }
-        }
-        wasVisibleRef.current = isVisible;
-    }, [isVisible, gameState.isGameRunning, gameState.isPaused, onTogglePause]);
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    if (ctx) {
+      render(ctx, items, slashTrail, particles);
+      // Render blade trail on top
+      renderBladeTrail(ctx);
+    }
+  }, [items, slashTrail, particles, render, renderBladeTrail]);
 
+  const handleMouseDown = useCallback((e) => {
+    startSlashing();
+    startSlash(e);
+  }, [startSlashing, startSlash]);
 
-    // Clean up excess items periodically
-    useEffect(() => {
-        if (itemCount > 15) { // If items exceed safe threshold
-            cleanupExcessItems();
-        }
-    }, [itemCount, cleanupExcessItems]);
+  const handleMouseMove = useCallback((e) => {
+    updateSlash(e);
+  }, [updateSlash]);
 
+  const handleMouseUp = useCallback(() => {
+    stopSlashing();
+    endSlash();
+  }, [stopSlashing, endSlash]);
 
-    useEffect(() => {
-        const ctx = ctxRef.current;
-        if (ctx) {
-            render(ctx, items, slashTrail, particles);
-            renderBladeTrail(ctx); // Render blade trail on top
-        }
-    }, [items, slashTrail, particles, render, renderBladeTrail]);
+  const handleTouchStart = useCallback((e) => {
+    e.preventDefault();
+    startSlashing();
+    startSlash(e.touches[0]);
+  }, [startSlashing, startSlash]);
 
+  const handleTouchMove = useCallback((e) => {
+    e.preventDefault();
+    updateSlash(e.touches[0]);
+  }, [updateSlash]);
 
-    const handleMouseDown = useCallback((e) => {
-        startSlashing();
-        startSlash(e);
-    }, [startSlashing, startSlash]);
+  const handleTouchEnd = useCallback((e) => {
+    e.preventDefault();
+    stopSlashing();
+    endSlash();
+  }, [endSlash]);
 
-    const handleMouseMove = useCallback((e) => {
-        updateSlash(e);
-    }, [updateSlash]);
-
-    const handleMouseUp = useCallback(() => {
-        stopSlashing();
-        endSlash();
-    }, [stopSlashing, endSlash]);
-
-    const handleTouchStart = useCallback((e) => {
-        e.preventDefault();
-        startSlashing();
-        startSlash(e.touches[0]);
-    }, [startSlashing, startSlash]);
-
-    const handleTouchMove = useCallback((e) => {
-        e.preventDefault();
-        updateSlash(e.touches[0]);
-    }, [updateSlash]);
-
-    const handleTouchEnd = useCallback((e) => {
-        e.preventDefault();
-        stopSlashing();
-        endSlash();
-    }, [endSlash, stopSlashing]);
-
-
-    return (
-        <div className="screen game-screen fullscreen">
-            {/* Floating UI Elements */}
-            <div className="game-ui-overlay">
-
-                <div className="game-header-overlay">
-                    <div className="highest-score-container">
-                        <div className="highest-score-label">Best</div>
-                        <div className="highest-score-value">{gameState.bestScore}</div>
-                    </div>
-                </div>
-
-                <div className="score-container">
-                    <div className="score-label">Score</div>
-                    <div className="score-value">{gameState.score}</div>
-                </div>
-
-                {/* Lives container positioned below wallet widget */}
-                <div className="lives-container-overlay">
-                    <div className="lives-label">Lives</div>
-                    <div className="hearts">
-                        {[1, 2, 3].map(i => (
-                            <span
-                                key={i}
-                                className={`heart ${i > gameState.lives ? 'lost' : ''}`}
-                            >
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-
-                {itemCount > 10 && (
-                    <div className="performance-warning">
-                        <div style={{ color: '#ff6b35', fontSize: '12px', fontWeight: 'bold', textShadow: '0 0 10px rgba(255, 107, 53, 0.8)' }}>
-                            Items: {itemCount}
-                        </div>
-                    </div>
-                )}
-
-
-                <button
-                    className="btn btn--outline pause-btn-overlay"
-                    type="button"
-                    onClick={onTogglePause}
-                >
-                    <span>{gameState.isPaused ? '▶' : '❚❚'}</span>
-                </button>
-            </div>
-
-            {/* Full Screen Canvas */}
-            <canvas
-                ref={canvasRef}
-                className="game-canvas fullscreen-canvas"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-            />
+  return (
+    <div className="screen game-screen fullscreen">
+      {/* Floating UI Elements */}
+      <div className="game-ui-overlay">
+        <div className="game-header-overlay">
+          <div className="highest-score-container">
+            <div className="highest-score-label">Best</div>
+            <div className="highest-score-value">{gameState.bestScore}</div>
+          </div>
+          
+          <div className="score-container">
+            <div className="score-label">Score</div>
+            <div className="score-value">{gameState.score}</div>
+          </div>
         </div>
-    );
+        
+        {/* Lives container positioned below wallet widget */}
+        <div className="lives-container-overlay">
+          <div className="lives-label">Lives</div>
+          <div className="hearts">
+            {[1, 2, 3].map(i => (
+              <span 
+                key={i}
+                className={`heart ${i > gameState.lives ? 'lost' : ''}`}
+              >
+                ♥
+              </span>
+            ))}
+          </div>
+        </div>
+        
+        {itemCount > 10 && (
+          <div className="performance-warning">
+            <div style={{ 
+              color: '#ff6b35', 
+              fontSize: '12px', 
+              fontWeight: 'bold',
+              textShadow: '0 0 10px rgba(255, 107, 53, 0.8)'
+            }}>
+              Items: {itemCount}
+            </div>
+          </div>
+        )}
+        
+        <button 
+          className="btn btn--outline pause-btn-overlay" 
+          type="button"
+          onClick={onTogglePause}
+        >
+          <span>{gameState.isPaused ? '▶️' : '⏸️'}</span>
+        </button>
+      </div>
+      
+      {/* Full Screen Canvas */}
+      <canvas 
+        ref={canvasRef}
+        className="game-canvas fullscreen-canvas"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
+      
+      {/* Point Popups */}
+      <PointPopup popups={popups} onRemovePopup={removePopup} />
+    </div>
+  );
 };
 
 export default GameScreen;

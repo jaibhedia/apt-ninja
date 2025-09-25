@@ -22,17 +22,23 @@ const getRandomItemType = () => {
   return ITEM_TYPES[0];
 };
 
-export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles) => {
+export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles, onFruitMissed, difficultyLevel = 1) => {
   const [items, setItems] = useState([]);
   const [slashTrail, setSlashTrail] = useState([]);
   const [particles, setParticles] = useState([]);
   const [aptosImage, setAptosImage] = useState(null);
   const isVisible = useVisibility();
 
-  // Load Aptos token image
+  // Load Aptos token SVG image
   useEffect(() => {
     const img = new Image();
-    img.onload = () => setAptosImage(img);
+    img.onload = () => {
+      console.log('Aptos token SVG loaded successfully');
+      setAptosImage(img);
+    };
+    img.onerror = () => {
+      console.error('Failed to load Aptos token SVG');
+    };
     img.src = '/aptos-token.svg';
   }, []);
 
@@ -59,22 +65,25 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles) =>
     const canvas = canvasRef.current;
     const itemType = getRandomItemType();
     
+    // Calculate speed multiplier based on difficulty (10% faster each level)
+    const speedMultiplier = 1 + (difficultyLevel - 1) * 0.1;
+    
     const item = {
       id: Math.random(),
       x: Math.random() * (canvas.width - 80) + 40,
       y: -40,
-      vx: (Math.random() - 0.5) * 3,
-      vy: 2 + Math.random() * 2,
+      vx: (Math.random() - 0.5) * 3 * speedMultiplier,
+      vy: (2 + Math.random() * 2) * speedMultiplier,
       radius: itemType.name === 'Bomb' ? 25 : 30,
       rotation: 0,
-      rotationSpeed: (Math.random() - 0.5) * 0.15,
+      rotationSpeed: (Math.random() - 0.5) * 0.15 * speedMultiplier,
       type: itemType,
       slashed: false,
       trail: [] // Store trail points for fluid motion
     };
     
     setItems(prev => [...prev, item]);
-  }, [gameState.isGameRunning, gameState.isPaused, canvasRef, isVisible, items.length]);
+  }, [gameState.isGameRunning, gameState.isPaused, canvasRef, isVisible, items.length, difficultyLevel]);
 
   const updateGame = useCallback(() => {
     if (!gameState.isGameRunning || gameState.isPaused || !canvasRef.current) return;
@@ -117,6 +126,12 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles) =>
         };
       })
       .filter(item => {
+        // Check if a good item (fruit) fell off the bottom of the screen without being slashed
+        if (item.y > canvas.height + 50 && item.type.isGood && !item.slashed && onFruitMissed) {
+          console.log('Fruit missed! Losing a life.');
+          onFruitMissed(); // Deduct a life when a fruit is missed and show notification
+        }
+        
         // More aggressive cleanup - remove items that are well off screen
         return item.y <= canvas.height + 100 && 
                item.x >= -100 && 
@@ -197,67 +212,87 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles) =>
         ctx.textBaseline = 'middle';
         ctx.fillText(item.type.symbol, 0, 0);
       } else {
-        // Draw Aptos token with yellow glow
+        // Draw Aptos Carrom Token - Clean, Professional Design
+        ctx.save();
+        
+        // Create premium carrom token with elegant gradient
+        const tokenGradient = ctx.createRadialGradient(
+          -item.radius * 0.4, -item.radius * 0.4, 0,
+          0, 0, item.radius * 1.2
+        );
+        tokenGradient.addColorStop(0, '#ffffff');
+        tokenGradient.addColorStop(0.3, '#f8f9fa');
+        tokenGradient.addColorStop(0.7, '#e9ecef');
+        tokenGradient.addColorStop(1, '#dee2e6');
+        
+        // Draw main carrom token disc
+        ctx.fillStyle = tokenGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add carrom-style shadow for depth
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 3;
+        
+        // Reset shadow for borders
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Outer carrom token border - dark edge
+        ctx.strokeStyle = '#6c757d';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner highlight border for carrom beveled edge
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius - 4, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Always use Aptos SVG logo in center
         if (aptosImage) {
-          // Add golden glow effect
-          ctx.shadowColor = '#ffd700';
-          ctx.shadowBlur = 15;
-          
-          // Create circular clipping mask
+          // Create clean circular clipping for the Aptos logo
           ctx.save();
+          const logoRadius = item.radius * 0.65; // Logo takes 65% of token
           ctx.beginPath();
-          ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
+          ctx.arc(0, 0, logoRadius, 0, Math.PI * 2);
           ctx.clip();
           
-          // Draw the SVG image within the circular mask - force square dimensions
-          const size = item.radius * 2;
-          // Center the image and ensure it's square
+          // Draw the Aptos SVG logo centered
+          const logoSize = logoRadius * 2;
           ctx.drawImage(
             aptosImage,
-            -item.radius,
-            -item.radius,
-            size,
-            size
+            -logoRadius,
+            -logoRadius,
+            logoSize,
+            logoSize
           );
           
           ctx.restore();
           
-          // Add circular border with golden color
-          ctx.shadowBlur = 0;
-          ctx.strokeStyle = '#ffd700';
-          ctx.lineWidth = 3;
+          // Add Aptos brand border around the logo
+          ctx.strokeStyle = '#00d4aa';
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
+          ctx.arc(0, 0, logoRadius + 1, 0, Math.PI * 2);
           ctx.stroke();
         } else {
-          // Fallback: Draw Aptos token with golden glow
-          ctx.shadowColor = '#ffd700';
-          ctx.shadowBlur = 15;
-          
-          // Golden circle background
-          const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, item.radius);
-          gradient.addColorStop(0, '#ffd700');
-          gradient.addColorStop(0.7, '#ffb000');
-          gradient.addColorStop(1, '#ff8c00');
-          
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Dark border for contrast
-          ctx.shadowBlur = 0;
-          ctx.strokeStyle = '#333333';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Draw "APT" text
-          ctx.fillStyle = '#000000';
-          ctx.font = `bold ${item.radius * 0.6}px Arial`;
+          // Fallback if SVG doesn't load - keep minimal
+          ctx.fillStyle = '#00d4aa';
+          ctx.font = `bold ${item.radius * 0.7}px Arial`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('APT', 0, 0);
         }
+        
+        ctx.restore();
       }
       
       ctx.restore();
@@ -294,7 +329,7 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles) =>
       ctx.fill();
       ctx.restore();
     });
-  }, [canvasRef]);
+  }, [canvasRef, aptosImage]);
 
   const clearAllItems = useCallback(() => {
     setItems([]);
