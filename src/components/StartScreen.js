@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useWallet } from './AptosWalletProvider';
+import { useAptosService } from '../services/aptos_service.js';
 import WalletConnectionModal from './WalletConnectionModal';
 
 const StartScreen = ({ bestScore, onStartGame }) => {
   const { connected } = useWallet();
+  const { isSessionAuthorized } = useAptosService();
   const [showWalletModal, setShowWalletModal] = useState(false);
 
   const handlePlayClick = () => {
-    if (connected) {
+    if (connected && isSessionAuthorized) {
       onStartGame();
     } else {
       setShowWalletModal(true);
@@ -39,12 +41,16 @@ const StartScreen = ({ bestScore, onStartGame }) => {
           type="button"
           onClick={handlePlayClick}
         >
-          <span>{connected ? 'PLAY' : 'CONNECT WALLET TO PLAY'}</span>
+          <span>
+            {connected && isSessionAuthorized ? 'PLAY' : 
+             connected ? 'AUTHORIZING SESSION...' : 
+             'CONNECT WALLET TO PLAY'}
+          </span>
         </button>
         
-        {!connected && (
+        {(!connected || !isSessionAuthorized) && (
           <div className="wallet-required-notice">
-            <p>🔒 Wallet connection required to play</p>
+            <p>🔒 {!connected ? 'Wallet connection required to play' : 'Authorizing blockchain session...'}</p>
           </div>
         )}
       </div>

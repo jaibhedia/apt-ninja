@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
+import { useAptosService } from '../services/aptos_service.js';
 
 export const useGameState = () => {
+  const { handleStartGame, handleSlashFruit, handleEndGame } = useAptosService();
   const [gameState, setGameState] = useState({
     screen: 'start',
     score: 0,
@@ -15,7 +17,7 @@ export const useGameState = () => {
     bombsHit: 0
   });
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback(async () => {
     setGameState(prev => ({
       ...prev,
       screen: 'game',
@@ -28,9 +30,16 @@ export const useGameState = () => {
       aptosSlashed: 0,
       bombsHit: 0
     }));
-  }, []);
+    
+    // Call Aptos service to start game on blockchain
+    try {
+      await handleStartGame();
+    } catch (error) {
+      console.error('Failed to start game on blockchain:', error);
+    }
+  }, [handleStartGame]);
 
-  const endGame = useCallback(() => {
+  const endGame = useCallback(async () => {
     setGameState(prev => {
       const newBestScore = prev.score > prev.bestScore ? prev.score : prev.bestScore;
       if (newBestScore > prev.bestScore) {
@@ -45,7 +54,14 @@ export const useGameState = () => {
         bestScore: newBestScore
       };
     });
-  }, []);
+    
+    // Call Aptos service to end game on blockchain
+    try {
+      await handleEndGame();
+    } catch (error) {
+      console.error('Failed to end game on blockchain:', error);
+    }
+  }, [handleEndGame]);
 
   const showStartScreen = useCallback(() => {
     setGameState(prev => ({
@@ -54,16 +70,23 @@ export const useGameState = () => {
     }));
   }, []);
 
-  const updateScore = useCallback((points) => {
+  const updateScore = useCallback(async (points) => {
     setGameState(prev => ({
       ...prev,
       score: prev.score + points,
       aptosSlashed: prev.aptosSlashed + 1,
       totalSlashes: prev.totalSlashes + 1
     }));
-  }, []);
+    
+    // Record the slash on blockchain
+    try {
+      await handleSlashFruit(points);
+    } catch (error) {
+      console.error('Failed to record slash on blockchain:', error);
+    }
+  }, [handleSlashFruit]);
 
-  const loseLife = useCallback(() => {
+  const loseLife = useCallback(async () => {
     setGameState(prev => {
       // Only remove one heart if we have any hearts left
       if (prev.lives <= 0) return prev;
@@ -87,29 +110,28 @@ export const useGameState = () => {
         totalSlashes: prev.totalSlashes + 1
       };
       
-      // End game when all lives are lost
-      if (newLives <= 0) {
-        setTimeout(() => {
-          setGameState(current => {
-            const finalBestScore = current.score > current.bestScore ? current.score : current.bestScore;
-            if (finalBestScore > current.bestScore) {
-              localStorage.setItem('fruitNinjaBestScore', finalBestScore.toString());
-            }
-            
-            return {
-              ...current,
-              screen: 'results',
-              isGameRunning: false,
-              isPaused: false,
-              bestScore: finalBestScore
-            };
-          });
-        }, 1000);
-      }
-      
       return newState;
     });
-  }, []);
+    
+    // Record bomb hit on blockchain (negative score change)
+    try {
+      await handleSlashFruit(-10); // Deduct points for bomb hit
+    } catch (error) {
+      console.error('Failed to record bomb hit on blockchain:', error);
+    }
+    
+    // Check if game should end after state update
+    setGameState(prev => {
+      if (prev.lives <= 0) {
+        setTimeout(async () => {
+          await endGame();
+        }, 1000);
+      }
+      return prev;
+    });
+  }, [handleSlashFruit, endGame]);
+      
+
 
   const loseLiveFromMissedToken = useCallback(() => {
     setGameState(prev => {

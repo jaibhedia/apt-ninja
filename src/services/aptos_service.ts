@@ -8,7 +8,7 @@ const aptos = new Aptos(APTOS_CONFIG);
 // TODO: Replace with your deployed contract address
 const CONTRACT_ADDRESS = "0xad94bb008073df8c8740d4474e52a6ddf226d3c84223e66fd861fb29810f073";
 
-export function useAptosService() {
+export const useAptosService = () => {
     const { account, signAndSubmitTransaction } = useWallet();
     const [sessionKey, setSessionKey] = useState(null);
     const [isSessionAuthorized, setIsSessionAuthorized] = useState(false);
@@ -32,7 +32,8 @@ export function useAptosService() {
                     newSessionKey.accountAddress, // The key to authorize
                     300, // Authorize for 5 minutes (300 seconds)
                 ],
-            },
+
+            }, 
         };
 
         try {

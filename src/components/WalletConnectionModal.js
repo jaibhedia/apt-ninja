@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWallet } from './AptosWalletProvider';
+import { useAptosService } from '../services/aptos_service.js';
 
 const WalletConnectionModal = ({ onClose }) => {
   const {
@@ -8,6 +9,8 @@ const WalletConnectionModal = ({ onClose }) => {
     connecting,
     wallets,
   } = useWallet();
+  
+  const { handleAuthorizeSession, isSessionAuthorized } = useAptosService();
 
   const connectToWallet = (walletName) => {
     connect(walletName);
@@ -24,12 +27,20 @@ const WalletConnectionModal = ({ onClose }) => {
     }
   };
 
-  // Close modal if wallet gets connected
+  // Handle wallet connection and session authorization
   React.useEffect(() => {
-    if (connected) {
+    if (connected && !isSessionAuthorized) {
+      // Automatically authorize session when wallet connects
+      handleAuthorizeSession();
+    }
+  }, [connected, isSessionAuthorized, handleAuthorizeSession]);
+
+  // Close modal if wallet gets connected and session is authorized
+  React.useEffect(() => {
+    if (connected && isSessionAuthorized) {
       onClose();
     }
-  }, [connected, onClose]);
+  }, [connected, isSessionAuthorized, onClose]);
 
   return (
     <div className="wallet-connection-modal">
