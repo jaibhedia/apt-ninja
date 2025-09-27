@@ -3,12 +3,10 @@ import StartScreen from './components/StartScreen';
 import GameScreen from './components/GameScreen';
 import ResultsScreen from './components/ResultsScreen';
 import ParticleContainer from './components/ParticleContainer';
-import WalletSelector from './components/WalletSelector';
 import LandingPage from './components/LandingPage';
-import WalletWidget from './components/WalletWidget';
 import { useGameState } from './hooks/useGameState';
 import { useTaskbarControls } from './hooks/useTaskbarControls';
-import { useWallet } from './components/AptosWalletProvider';
+// Wallet functionality removed
 import './App.css';
 
 function App() {
@@ -23,7 +21,7 @@ function App() {
     createScreenFlash
   } = useGameState();
 
-  const { connected, account } = useWallet();
+  // Wallet functionality removed
   const [particles, setParticles] = useState([]);
   const [showLanding, setShowLanding] = useState(true);
 
@@ -120,24 +118,17 @@ function App() {
 
   return (
     <div className="App">
-      {!connected && (
-        // Show navbar only when not connected
-        <div className="game-header">
-          <div className="game-nav-brand">
-            <img src="/aptos-token.svg" alt="APT" className="game-nav-logo" />
-            <button className="back-to-landing-btn" onClick={handleBackToLanding}>
-              ← Back to Home
-            </button>
-          </div>
-          <WalletSelector />
+      <div className="game-header">
+        <div className="game-nav-brand">
+          <img src="/logo.png" alt="Logo" className="game-nav-logo" />
+          <button className="back-to-landing-btn" onClick={handleBackToLanding}>
+            ← Back to Home
+          </button>
         </div>
-      )}
+      </div>
 
       {renderScreen()}
       <ParticleContainer particles={particles} />
-      
-      {/* Show wallet widget when connected */}
-      {connected && <WalletWidget />}
     </div>
   );
 }

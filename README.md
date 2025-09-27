@@ -1,10 +1,10 @@
-# Aptos Coin Ninja - React Version
+# Citrea Ninja - React Version
 
-A React.js rewrite of the Aptos Coin Ninja game, preserving all original aesthetics, animations, design, feel, and functionality.
+A React.js ninja-style slashing game with smooth animations, particle effects, and responsive design.
 
 ## Overview
 
-Aptos Coin Ninja is a fruit ninja-style game where players slash Aptos tokens to earn points while avoiding bombs. This React version maintains:
+Citrea Ninja is a fruit ninja-style game where players slash coins to earn points while avoiding bombs. This game features:
 
 - ✅ All original visual design and aesthetics
 - ✅ Smooth animations and particle effects
@@ -16,16 +16,16 @@ Aptos Coin Ninja is a fruit ninja-style game where players slash Aptos tokens to
 ## Features
 
 ### Game Mechanics
-- **Slash Aptos tokens** for 10 points each
+- **Slash Citrea tokens** for 10 points each
 - **Avoid bombs** or lose a life
 - **3 lives total** - game ends when all lives are lost
 - **Progressive difficulty** with increasing item spawn rates
 - **Accuracy tracking** and detailed statistics
 
 ### Visual Features
-- **Particle effects** on coin slashing
+- **Particle effects** on Citrea token slashing
 - **Screen flash** effects for wrong slashes
-- **Animated coin sprites** with rotation
+- **Animated Citrea token sprites** with rotation
 - **Slash trail effects** following mouse/touch
 - **Responsive canvas** that adapts to screen size
 - **Dark/light theme support** via CSS variables
@@ -76,7 +76,7 @@ src/
 ### StartScreen
 - Displays game title and instructions
 - Shows best score from localStorage
-- Animated Aptos logo with floating effect
+- Animated coin logo with floating effect
 - Play button to start the game
 
 ### GameScreen
@@ -120,13 +120,13 @@ The game features 2 different item types with weighted spawning:
 
 | Item | Symbol | Color | Points | Spawn Weight | Effect |
 |------|---------|-------|--------|--------------|--------|
-| Aptos Token | APT | Black/White | +10 | 90% | Score increase |
+| Citrea Token | Logo Image | Orange | +10 | 90% | Score increase |
 | Bomb | 💣 | Dark Gray | 0 | 10% | Lose life |
 
 ## Controls
 
-- **Desktop**: Click and drag to slash tokens
-- **Mobile**: Touch and drag to slash tokens
+- **Desktop**: Click and drag to slash Citrea tokens
+- **Mobile**: Touch and drag to slash Citrea tokens
 - **Pause**: Click pause button during gameplay
 - **Navigation**: Use on-screen buttons for menu navigation
 

@@ -433,10 +433,10 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.main-coin {
+.main-lime {
   width: 120px;
   height: 120px;
-  background: linear-gradient(135deg, #FF6B35, #F7931E);
+  background: linear-gradient(135deg, #32CD32, #228B22);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -444,8 +444,8 @@ p {
   font-size: 60px;
   font-weight: var(--font-weight-bold);
   color: var(--color-white);
-  box-shadow: 0 0 30px rgba(255, 107, 53, 0.6);
-  border: 3px solid #FF6B35;
+  box-shadow: 0 0 30px rgba(50, 205, 50, 0.6);
+  border: 3px solid #32CD32;
 }
 
 @keyframes float {
@@ -889,7 +889,7 @@ p {
   100% { opacity: 0; }
 }
 
-.coin-slice-effect {
+.lime-slice-effect {
   position: absolute;
   width: 60px;
   height: 60px;
@@ -967,7 +967,7 @@ p {
     font-size: var(--font-size-3xl);
   }
   
-  .main-coin {
+  .main-lime {
     width: 100px;
     height: 100px;
   }

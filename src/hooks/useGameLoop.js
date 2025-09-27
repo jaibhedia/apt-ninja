@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useVisibility } from './useVisibility';
 
 const ITEM_TYPES = [
-  { name: "Aptos", symbol: "APT", color: "#ffd700", isGood: true, points: 10, spawnWeight: 0.9 },
+  { name: "Citrea", symbol: "IMAGE", color: "#F4A261", isGood: true, points: 10, spawnWeight: 0.9 },
   { name: "Bomb", symbol: "💣", color: "#ff4444", isGood: false, points: 0, spawnWeight: 0.1 }
 ];
 
@@ -26,20 +26,20 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles, on
   const [items, setItems] = useState([]);
   const [slashTrail, setSlashTrail] = useState([]);
   const [particles, setParticles] = useState([]);
-  const [aptosImage, setAptosImage] = useState(null);
+  const [citreaImage, setCitreaImage] = useState(null);
   const isVisible = useVisibility();
 
-  // Load Aptos token SVG image
+  // Load Citrea logo SVG image
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      console.log('Aptos token SVG loaded successfully');
-      setAptosImage(img);
+      console.log('Citrea logo SVG loaded successfully');
+      setCitreaImage(img);
     };
     img.onerror = () => {
-      console.error('Failed to load Aptos token SVG');
+      console.error('Failed to load Citrea logo SVG');
     };
-    img.src = '/aptos-token.svg';
+    img.src = '/citrea-logo.svg';
   }, []);
 
   // Clean up items when tab becomes visible again to prevent accumulation
@@ -256,19 +256,19 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles, on
         ctx.arc(0, 0, item.radius - 4, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Always use Aptos SVG logo in center
-        if (aptosImage) {
-          // Create clean circular clipping for the Aptos logo
+        // Always use Citrea SVG logo in center
+        if (citreaImage) {
+          // Create clean circular clipping for the Citrea logo
           ctx.save();
           const logoRadius = item.radius * 0.65; // Logo takes 65% of token
           ctx.beginPath();
           ctx.arc(0, 0, logoRadius, 0, Math.PI * 2);
           ctx.clip();
           
-          // Draw the Aptos SVG logo centered
+          // Draw the Citrea SVG logo centered
           const logoSize = logoRadius * 2;
           ctx.drawImage(
-            aptosImage,
+            citreaImage,
             -logoRadius,
             -logoRadius,
             logoSize,
@@ -277,19 +277,19 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles, on
           
           ctx.restore();
           
-          // Add Aptos brand border around the logo
-          ctx.strokeStyle = '#00d4aa';
+          // Add Citrea brand border around the logo
+          ctx.strokeStyle = '#F4A261';
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(0, 0, logoRadius + 1, 0, Math.PI * 2);
           ctx.stroke();
         } else {
           // Fallback if SVG doesn't load - keep minimal
-          ctx.fillStyle = '#00d4aa';
-          ctx.font = `bold ${item.radius * 0.7}px Arial`;
+          ctx.fillStyle = '#F4A261';
+          ctx.font = `bold ${item.radius * 0.6}px Arial`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('APT', 0, 0);
+          ctx.fillText('CITREA', 0, 0);
         }
         
         ctx.restore();
@@ -329,7 +329,7 @@ export const useGameLoop = (canvasRef, gameState, onEndGame, updateParticles, on
       ctx.fill();
       ctx.restore();
     });
-  }, [canvasRef, aptosImage]);
+  }, [canvasRef, citreaImage]);
 
   const clearAllItems = useCallback(() => {
     setItems([]);

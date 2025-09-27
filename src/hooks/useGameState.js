@@ -1,8 +1,6 @@
 import { useState, useCallback } from 'react';
-import { useAptosService } from '../services/aptos_service.js';
 
 export const useGameState = () => {
-  const { handleStartGame, handleSlashFruit, handleEndGame, handleAuthorizeSession, isSessionAuthorized } = useAptosService();
   const [gameState, setGameState] = useState({
     screen: 'start',
     score: 0,
@@ -13,7 +11,7 @@ export const useGameState = () => {
     isGameRunning: false,
     isPaused: false,
     totalSlashes: 0,
-    aptosSlashed: 0,
+    limesSlashed: 0,
     bombsHit: 0
   });
 
@@ -27,28 +25,11 @@ export const useGameState = () => {
       isGameRunning: true,
       isPaused: false,
       totalSlashes: 0,
-      aptosSlashed: 0,
+      citreaSlashed: 0,
       bombsHit: 0
     }));
     
-    // Check if session is authorized first
-    if (!isSessionAuthorized) {
-      console.log('Session not authorized, authorizing session first...');
-      try {
-        await handleAuthorizeSession();
-      } catch (error) {
-        console.error('Failed to authorize session:', error);
-        return; // Don't start the game if session authorization fails
-      }
-    }
-    
-    // Call Aptos service to start game on blockchain
-    try {
-      await handleStartGame();
-    } catch (error) {
-      console.error('Failed to start game on blockchain:', error);
-    }
-  }, [handleStartGame, handleAuthorizeSession, isSessionAuthorized]);
+  }, []);
 
   const endGame = useCallback(async () => {
     setGameState(prev => {
@@ -66,13 +47,7 @@ export const useGameState = () => {
       };
     });
     
-    // Call Aptos service to end game on blockchain
-    try {
-      await handleEndGame();
-    } catch (error) {
-      console.error('Failed to end game on blockchain:', error);
-    }
-  }, [handleEndGame]);
+  }, []);
 
   const showStartScreen = useCallback(() => {
     setGameState(prev => ({
@@ -85,17 +60,11 @@ export const useGameState = () => {
     setGameState(prev => ({
       ...prev,
       score: prev.score + points,
-      aptosSlashed: prev.aptosSlashed + 1,
+      citreaSlashed: prev.citreaSlashed + 1,
       totalSlashes: prev.totalSlashes + 1
     }));
     
-    // Record the slash on blockchain
-    try {
-      await handleSlashFruit(points);
-    } catch (error) {
-      console.error('Failed to record slash on blockchain:', error);
-    }
-  }, [handleSlashFruit]);
+  }, []);
 
   const loseLife = useCallback(async () => {
     setGameState(prev => {
@@ -124,12 +93,7 @@ export const useGameState = () => {
       return newState;
     });
     
-    // Record bomb hit on blockchain (negative score change)
-    try {
-      await handleSlashFruit(-10); // Deduct points for bomb hit
-    } catch (error) {
-      console.error('Failed to record bomb hit on blockchain:', error);
-    }
+    // Bomb hit recorded locally
     
     // Check if game should end after state update
     setGameState(prev => {
@@ -140,7 +104,7 @@ export const useGameState = () => {
       }
       return prev;
     });
-  }, [handleSlashFruit, endGame]);
+  }, [endGame]);
       
 
 

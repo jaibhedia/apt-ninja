@@ -25,8 +25,8 @@ const ResultsScreen = ({ gameState, onStartGame, onShowStartScreen }) => {
           
           <div className="game-stats">
             <div className="stat-item">
-              <span className="stat-label">Aptos Tokens Slashed:</span>
-              <span className="stat-value">{gameState.aptosSlashed}</span>
+              <span className="stat-label">Citrea Tokens Slashed:</span>
+              <span className="stat-value">{gameState.citreaSlashed}</span>
             </div>
           </div>
         </div>
