@@ -1,4 +1,4 @@
-# Citrea Ninja - React Version
+# APT Ninja- React Version
 
 A React.js ninja-style slashing game with smooth animations, particle effects, and responsive design.
 
